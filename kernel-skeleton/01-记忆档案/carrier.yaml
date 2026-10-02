@@ -1,0 +1,33 @@
+# carrier.yaml —— 库实例身份（**I 层** · 跟库走，不跟套件走）
+#
+# 为什么单独一件、而不放进 MANIFEST.md：
+#   MANIFEST.md 属可被新版覆盖的 F 层件 —— 身份若写在那里，升级会**静默丢掉**。
+#   本件在 `01-记忆档案/`（升级时明确不覆盖的 I 层）⇒ **结构上丢不了**。
+#
+# 出厂一律为 null/[]（新生儿态，合法）。**首次落盘时**由宿主写入实值；此后**只更新
+# last_host / last_seen / trust**，`instance_id` **永不变**。
+#
+# 口径见 MANIFEST.md §六（载体 · 变动侦测）。
+
+# ── 身份轴（★ 先看这段：三层分清，换一层不动另两层）──────────────────────────
+#   人（记忆属于谁） → 载体（住在哪块盘） → 宿主（谁在读）
+#   · principal  ＝ 人轴    ：换机／换盘／换宿主都**不变**
+#      ★ 首选语义＝「**本机用户档** `local-profile`」（**可含本机档／配对设备档；非登录账号**）
+#        —— **记忆属于人，载体只是落脚**（原注释只在 MANIFEST 层写，本处补明）
+#   · instance_id＝ 库实例轴：**跟着这份库走**（克隆＝分身，见 MANIFEST §六）
+#   · last_host／trust＝ 宿主轴：**随时可换**
+principal:
+  # ★ 只写不透明代号（`p_<uuid>`），禁写人名 —— 承 MANIFEST §⑤ 不变量 2。
+  principal_id: null       # 「这个库属于谁」
+  label: null              # 可选，例：「本人的记忆」
+
+instance_id: null          # 库实例身份（自生成 UUID）——语义＝「这个库是谁」，不是「物理盘是谁」
+label: null                # 人类可读标签（例：「<名字>的记忆」）
+created: null              # 建库日期 YYYY-MM-DD
+last_host:
+  # ★ 只写**不透明代号**（`h_<uuid>`），禁写宿主真名／宿主路径 —— 承 MANIFEST §⑤ 不变量 2。
+  #   宿主真名只落 `adapters/<host>/NOTES.md`（适配层，本就允许改）。
+  host_id: null
+  machine_id: null         # 机位身份（本机自生成）
+last_seen: null            # 最近一次被读到的 UTC 时刻（ISO 8601）
+trust: []                  # 已信任的 host_id 代号列表（写入许可；空 = 陌生宿主，见 MANIFEST §七）

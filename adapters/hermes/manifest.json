@@ -1,0 +1,32 @@
+{
+  "name": "memory-kit-hermes",
+  "version": "0.1.23",
+  "description": "memory-kit 在 Nous Research Hermes Agent 上的接入声明 —— 形态：裸库直读（零改造）",
+  "author": "Snack Terminator & 姜姜",
+  "license": "MIT",
+  "entry": "AGENTS.md",
+  "roots": {
+    "code": "<套件目录>（只读）",
+    "data": "<套件目录>/instance/ 或用户自定目录"
+  },
+  "readOrder": "MANIFEST.md 「① 本轮必读」段（按序）",
+  "degraded": {
+    "note": "应用契约 §三-4 降级约定（未依赖任何宿主要求的根变量）",
+    "data": "instance/",
+    "run": "_run/"
+  },
+  "adapterShape": "bare-read",
+  "nonInteractiveInvocation": "hermes -z \"<prompt>\"",
+  "verified": {
+    "date": "2026-09-29",
+    "method": "造可弃实例（干净库根）→ 非交互 prompt 让宿主读入口件并复述读序 → 标记文件前后改读比对 → 静态查服务 → 宿主自有件 md5 前后比对",
+    "criteria": {
+      "1_can_read": "PASS",
+      "2_read_order": "PASS —— 逐行 6 件，顺序正确（SOUL→USER→IDENTITY→MEMORY→会话速读包→当日通告）",
+      "3_no_cache_drift": "PASS —— 文件内标记由 A 改为 B 后，宿主读到新值 B",
+      "4_no_daemon_needed": "PASS —— 套件内 0 处服务/网络调用（静态普查）",
+      "5_coexist": "PASS —— 宿主自有 SOUL.md / hermes-agent/AGENTS.md 的 md5 与基线完全一致（未被改动）"
+    },
+    "note": "**判据 1–5 全绿**（**本机实测 2026-09-30**；DSH 仅判据 1–2 已证，见 adapters/dsh/ —— **易变事实不入稳定件**，故不写「唯一」）"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "memory-kit-dsh",
+  "version": "0.1.23",
+  "description": "memory-kit 在 DeepSeek Harness（DSH）上的接入声明 —— 形态：裸库直读（零改造）",
+  "author": "Snack Terminator & 姜姜",
+  "license": "MIT",
+  "entry": "AGENTS.md",
+  "roots": {
+    "code": "<套件目录>（只读）",
+    "data": "<套件目录>/instance/ 或用户自定目录"
+  },
+  "readOrder": "MANIFEST.md 「① 本轮必读」段（按序）",
+  "degraded": {
+    "note": "DSH 未提供 PLUGIN_ROOT/PLUGIN_DATA 类根变量 ⇒ 按契约 §三-4 走约定目录",
+    "data": "instance/",
+    "run": "_run/"
+  },
+  "userConfig": {
+    "note": "DSH 不支持宿主侧配置渲染 ⇒ 可定制面走 kit.conf（见 docs/CUSTOMIZE.md）"
+  },
+  "adapterShape": "bare-read",
+  "verified": {
+    "date": "2026-09-29",
+    "method": "经绝对路径实读入口件与规范件，要求其复述读序",
+    "result": "读序复述正确 ⇒ 判据 1–2 通过",
+    "hard_criteria": "判据 3–5（缓存漂移／无常驻组件／共存）尚未逐项实测 ⇒ 标【部分已证】"
+  }
+}
