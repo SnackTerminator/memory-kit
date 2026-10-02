@@ -1,0 +1,39 @@
+{
+  "name": "memory-kit-workbuddy",
+  "version": "0.1.32",
+  "description": "memory-kit 在 WorkBuddy（母体）上的接入声明 —— 形态：接线注入（宿主钩子挂桥，不改内核）",
+  "author": "Snack Terminator & 姜姜",
+  "license": "MIT",
+  "entry": "AGENTS.md",
+  "roots": {
+    "code": "<套件目录>（只读）",
+    "data": "环境变量 MEMORY_KIT_LIB ／ <同步根>/记忆库（宿主侧解析）"
+  },
+  "readOrder": "MANIFEST.md 「① 本轮必读」段（按序）；本宿主实际走 digest 摘要注入",
+  "degraded": {
+    "note": "宿主未提供 MEMORY_KIT_DATA ⇒ 按契约 §三-4 走约定目录（MEMORY_KIT_LIB → 同步根 → instance/ 兜底并告警）",
+    "data": "instance/",
+    "run": "_run/"
+  },
+  "adapterShape": "wired-inject",
+  "wiring": {
+    "read": "SessionStart → tools/memory_bridge.py --inject（宿主侧脚本，非本套件）",
+    "writebackGate": "Stop → tools/memory_bridge.py --stop（只记不写；同日一次告警；不阻断）",
+    "note": "注入事件曾用 UserPromptSubmit，本机自 2026-09-30 起未被平台调用 ⇒ 已改挂 SessionStart（已实证在跑）"
+  },
+  "verified": {
+    "date": "2026-10-02",
+    "method": "库内实测：deploy → tests/gates_selftest.py --quiet → install/verify.py --root → tools/memory.py index/search → I 层 md5 前后比对",
+    "criteria": {
+      "1_can_read": "PASS —— 桥注入成功，digest 正常输出",
+      "2_read_order": "PARTIAL —— 走摘要注入非逐件读 6 件；读序由 MANIFEST 规约、digest 实现",
+      "3_no_cache_drift": "PASS —— 改库内件重跑 digest 即出新内容",
+      "4_no_daemon_needed": "PASS —— 每事件起一次进程；套件侧 0 处服务/网络调用",
+      "5_coexist": "PASS —— 宿主注入位（43,712 B）与库内（12,271 B）两版互不覆盖",
+      "6_physical_separation": "PASS —— F 层已装进库；记忆只在 01-记忆档案/",
+      "7_carrier_change_detectable": "PARTIAL —— 事件账已落 2 行；宿主侧无持久 h_<uuid> 生成器 ⇒ 靠会话自觉"
+    },
+    "knownDefect": "库内跑 install/verify.py 的第②项（新生儿态自检）必 FAIL —— 该判据要求以库根为套件根冷启动、需 kernel-skeleton/，而库内按设计不装骨架（装了会造第二个 01-记忆档案 ⇒ 踩 MANIFEST ⓪）。正解＝判据侧识别「库根」，属套件待办。",
+    "note": "**已连入两个宿主**（Hermes 裸库直读 ＋ WorkBuddy 桥注入）—— G4 判据②「≥2 异构宿主」在**形态**上更全（裸读＋注入两种接入面）"
+  }
+}

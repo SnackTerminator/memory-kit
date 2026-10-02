@@ -1,6 +1,6 @@
 {
   "name": "memory",
-  "version": "0.1.23",
+  "version": "0.1.32",
   "summary": "memory-kit 的读取路径（无常驻 · 随盘跑 · 零依赖）",
   "principles": [
     "不依赖任何常驻组件即可读",
@@ -17,37 +17,69 @@
     "get": {
       "usage": "memory get <相对路径>",
       "does": "原样输出该件内容 —— 用于宿主或脚本读取单条记忆",
-      "exit": { "0": "成功", "3": "参数错", "4": "找不到该件" }
+      "exit": {
+        "0": "成功",
+        "3": "参数错",
+        "4": "找不到该件"
+      }
     },
     "search": {
       "usage": "memory search <关键词> [--layer L0|L1|L2|L3] [--limit N]",
       "does": "在 01-记忆档案/ 下逐行匹配；输出 `相对路径:行号: 内容`",
-      "exit": { "0": "有命中", "1": "无命中", "3": "参数错" }
+      "exit": {
+        "0": "有命中",
+        "1": "无命中",
+        "3": "参数错"
+      }
     },
     "ask": {
       "usage": "memory ask <问句> [--layer L0|L1|L2|L3] [--top-k N] [--level session|doc|line]",
       "does": "**相关度检索**：倒排索引 ＋ BM25 打分，返回**带分数的前 N 条**（**保留返回顺序**，供宿主直接消费）",
       "note": "与 `search` 分工 —— `search`＝关键词定位（逐行子串）；`ask`＝相关度排序（治\"命中不难、排前难\"）。`--level` **三档**：**`session`（默认）＝件级返回 ＋ 行级打分**（件内取最佳行 · 兼顾覆盖与排序）；`doc`＝一件一条（覆盖最广）；`line`＝一行一条（排序最细）",
       "bounds": "**中文检索边界（如实 · 2026-10-02 实测）**：① **≥2 字**查询正常（含**非连续子串**）；② **单字**查询自 **v0.1.14** 起可命中（索引含 unigram；**旧索引须重建** —— 升级后按索引格式版本自动判失效重建）；③ **跨词界**（相邻两字拼成的串，如「州工」）**会命中** ⇒ **已知局限**：bigram **无词界信息**，业界同类 bigram 方案（ES `cjk_bigram`／SQLite FTS5 `cjk`）同此；④ **纯同义改写且无共同字** ⇒ **不命中**（无词表／无向量 · **词法上限**）；⑤ 单字入索引令**中文索引体积约 ×1.34**（实测），英文语料不受影响",
-      "exit": { "0": "有命中", "1": "无命中", "3": "参数错" }
+      "exit": {
+        "0": "有命中",
+        "1": "无命中",
+        "3": "参数错"
+      }
     },
     "index": {
       "usage": "memory index [--dry-run] [--level doc|line]",
       "does": "构建倒排索引派生物 `08-检索索引/inverted-<level>.json`（词项／文档频率／文档长度／doc 清单）；两级粒度各自成文件、互不覆盖",
       "writes": "**仅写 08-检索索引/**（可重建派生物）；**不碰真源**。`ask` 会自动判新鲜度（语料文件数 ＋ 最新 mtime ＋ **逐件 (rel,size) 摘要**），过期即内存现建；`ask --json` 给出 `stale` 位",
       "bounds": "**已知边界**：**同尺寸改内容且 mtime 被伪回 ⇒ 不可判**（如实标注，不假装完备）",
-      "exit": { "0": "成功", "3": "参数错" }
+      "exit": {
+        "0": "成功",
+        "3": "参数错"
+      }
     },
     "list": {
       "usage": "memory list [--layer L2]",
       "does": "列出条目（相对路径 + layer + family），用于清点",
-      "exit": { "0": "成功", "3": "参数错" }
+      "exit": {
+        "0": "成功",
+        "3": "参数错"
+      }
     },
     "reindex": {
       "usage": "memory reindex [--dry-run]",
       "does": "扫描库根，生成索引派生物 08-检索索引/_index.tsv（制表符分隔）",
       "writes": "**仅写 08-检索索引/**（可重建派生物）；**不碰真源**",
-      "exit": { "0": "成功", "3": "参数错" }
+      "exit": {
+        "0": "成功",
+        "3": "参数错"
+      }
+    },
+    "carry": {
+      "usage": "carry_check.py --root <库> [--write-baseline] [--json]",
+      "does": "**带走自检**（拔盘前／插盘后各跑一次）：① 全树逐件 md5 与基线比对（少件/多件/改动）② MANIFEST ①/② 段引用可达性 ③ 根变量与盘形",
+      "writes": "--write-baseline 时写 CHECKSUMS.tsv（真源面逐件 md5；**派生物目录与运行态不入基线**）",
+      "bounds": "**已知边界（如实）**：同尺寸改内容且 mtime 伪回 ⇒ 不可判；首次运行无基线 ⇒ 只报现状不判通过",
+      "exit": {
+        "0": "通过",
+        "1": "有差异",
+        "3": "参数错"
+      }
     }
   },
   "curate": {
@@ -60,11 +92,26 @@
       "propose 只写 _meta/curation/，不动任何记忆正文"
     ],
     "commands": {
-      "propose": { "usage": "curate propose --root <库根> [--candidates <清单>] [--quota 20]", "does": "起草提案（写 _meta/curation/proposals.json ＋ .md）；退出码 5＝有提案待处理" },
-      "apply": { "usage": "curate apply --root <库根> --preview ｜ --yes --proposal-fingerprint <8位> [--only <id,…>] [--batch --batch-count N]", "does": "确认应用（唯一改库动作）；先账后动（WAL）；批模式含 retire/merge 即拒" },
-      "state": { "usage": "curate state --root <库根>", "does": "库指纹对照 ＋ pending_proposals 可见（可弃缓存，非真源）" },
-      "ledger": { "usage": "curate ledger append|show|verify --root <库根>", "does": "台账与前像：verify 校验 prev_hash 链（只增）" },
-      "fuse": { "usage": "curate fuse --root <库根> [--checked N --wrong K --max-wrong-rate R]", "does": "熔断三类：空转／误判／借脑；触发 ⇒ 退出码 1（停手上报）" }
+      "propose": {
+        "usage": "curate propose --root <库根> [--candidates <清单>] [--quota 20]",
+        "does": "起草提案（写 _meta/curation/proposals.json ＋ .md）；退出码 5＝有提案待处理"
+      },
+      "apply": {
+        "usage": "curate apply --root <库根> --preview ｜ --yes --proposal-fingerprint <8位> [--only <id,…>] [--batch --batch-count N]",
+        "does": "确认应用（唯一改库动作）；先账后动（WAL）；批模式含 retire/merge 即拒"
+      },
+      "state": {
+        "usage": "curate state --root <库根>",
+        "does": "库指纹对照 ＋ pending_proposals 可见（可弃缓存，非真源）"
+      },
+      "ledger": {
+        "usage": "curate ledger append|show|verify --root <库根>",
+        "does": "台账与前像：verify 校验 prev_hash 链（只增）"
+      },
+      "fuse": {
+        "usage": "curate fuse --root <库根> [--checked N --wrong K --max-wrong-rate R]",
+        "does": "熔断三类：空转／误判／借脑；触发 ⇒ 退出码 1（停手上报）"
+      }
     }
   },
   "purge": {
@@ -77,9 +124,18 @@
       "默认 --preview 零写；执行须 --yes ＋ 回贴回执指纹"
     ],
     "commands": {
-      "purge": { "usage": "purge --root <库根> --target <相对路径> --operator <不透明 id> --preview ｜ --yes --receipt-fingerprint <期望值／首次 NEW> [--sweep-archive]", "does": "真删 ＋ 清命中副本；退出码 0 成功/预览 ｜ 1 有残留或拒" },
-      "audit": { "usage": "purge audit --root <库根> [--target <相对路径>]", "does": "只读核验：内容面 ＋ 路径面（可重建派生物）残留；必出**边界四要素**行" },
-      "verify": { "usage": "purge verify --root <库根>", "does": "回执链校验（append-only 自校验）" }
+      "purge": {
+        "usage": "purge --root <库根> --target <相对路径> --operator <不透明 id> --preview ｜ --yes --receipt-fingerprint <期望值／首次 NEW> [--sweep-archive]",
+        "does": "真删 ＋ 清命中副本；退出码 0 成功/预览 ｜ 1 有残留或拒"
+      },
+      "audit": {
+        "usage": "purge audit --root <库根> [--target <相对路径>]",
+        "does": "只读核验：内容面 ＋ 路径面（可重建派生物）残留；必出**边界四要素**行"
+      },
+      "verify": {
+        "usage": "purge verify --root <库根>",
+        "does": "回执链校验（append-only 自校验）"
+      }
     }
   },
   "acceptanceCriteria": {

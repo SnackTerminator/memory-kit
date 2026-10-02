@@ -142,6 +142,33 @@ def _qzone(p: Path, n: int) -> list:
     return out[:n]
 
 
+def _pending(root: Path) -> "tuple[str, str]":
+    """取速读包首行的「**待确认：N 条**」⇒ 返回 (N, 原文行)。
+
+    **为什么单列（2026-10-02 插盘演练抓出）**：D 焊点（`CONTRACT §八 D`「确认」）的**唯一显示面**
+    就是这一行（`spec/记忆形成与容量治理.md §十一` 明写「速读包首行体现待确认数」），
+    而它落在**文件头部的 `> ` 引用块**里 —— 原 `_qzone()` **只认 `- ` 开头行** ⇒ **结构上取不到**
+    ⇒ **焊点在纸上有、实际看不见**（静默失效）。
+    取不到时返回 ("", "") ⇒ 调用方据空值**明说「未探/未写」**，不编数字。
+    """
+    p = root / "01-记忆档案" / "记忆工程" / "会话速读包.md"
+    if not p.is_file():
+        return ("", "")
+    try:
+        txt = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ("", "")
+    for ln in txt.splitlines():
+        if "待确认" in ln:
+            # ★ 容错：速读包实况是 `> **待确认**：0 条` ⇒ 星号在**冒号左边**，
+            #   故不能只在冒号右侧吃 `**`（原式就是因此匹配失败）—— 两侧都容错。
+            m = re.search(r"待确认\**\s*[：:]\s*\**\s*(\d+)", ln)
+            if m:
+                return (m.group(1), ln.strip())
+            return ("", ln.strip())
+    return ("", "")
+
+
 def _last_update(root: Path) -> "tuple[str, int, int]":
     """库最后更新时间戳（扫 01-记忆档案/**），返回 (ISO, 距今天数, 件数)。"""
     base = root / "01-记忆档案"
@@ -158,6 +185,50 @@ def _last_update(root: Path) -> "tuple[str, int, int]":
         return ("（无）", -1, n)
     days = int((time.time() - newest) // 86400)
     return (dt.datetime.fromtimestamp(newest).strftime("%Y-%m-%d %H:%M"), days, n)
+
+
+def _unconsumed(a: Path) -> list:
+    """未消费件摘要（2026-10-02 加 · 治「有进无出」）。
+
+    由来：外部独立评审（Hermes 2026-10-02）裁定「先动消费口」—— `.learnings/` 三件
+    与事件账此前「开局不读、digest 不取」，属**有进无出**。本函数即其读取出口。
+    """
+    le = a / ".learnings"
+
+    def _cnt(p: Path, pat: str) -> int:
+        if not p.is_file():
+            return 0
+        try:
+            t = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return 0
+        t = re.sub(r"```.*?```", "", t, flags=re.S)   # 配对栅栏整体剥 ⇒ 不把「格式示例」计成真条目
+        i = t.find("```")
+        if i != -1:                                   # 含未闭合（奇数）栅栏 ⇒ 自首个残留栅栏起全剥
+            t = t[:i]                                 # （承外部评审交叉发现⑤：只剥栅栏行则块内内容仍被计数）
+        return len(re.findall(pat, t, re.M))
+
+    j = _cnt(le / "ERRORS.md", r"^\|\s*\*\*J\d+")
+    l = _cnt(le / "LEARNINGS.md", r"^###\s*L\d+")
+    s = _cnt(le / "SEED.md", r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s*\|")
+
+    ev = a / "记忆工程" / "carrier-events.log"
+    e_cnt, e_last = 0, "（无）"
+    if ev.is_file():
+        try:
+            rows = [x.strip() for x in ev.read_text(encoding="utf-8", errors="replace").splitlines() if x.strip()]
+        except OSError:
+            rows = []
+        e_cnt = len(rows)
+        if rows:
+            parts = [x.strip() for x in rows[-1].split("|")]
+            if len(parts) >= 5:
+                e_last = "%s · %s" % (parts[0][:10], parts[4])
+
+    return [
+        "- 判据层 `ERRORS.md` **%d 条**（`J##`）｜方法 `LEARNINGS.md` **%d 条**｜来源归因 `SEED.md` **%d 行**" % (j, l, s),
+        "- 事件账 `carrier-events.log` **%d 条**（末条 %s）" % (e_cnt, e_last),
+    ]
 
 
 def build(root: Path, via: str) -> str:
@@ -186,14 +257,25 @@ def build(root: Path, via: str) -> str:
     L += ["- " + x.lstrip("- ").strip() for x in now] or ["- （N0 新生儿态：尚无当前事项）"]
     L.append("")
     L.append("## 四、状态（自证 · 每轮可见）")
+    # ★ D 焊点显示面：**待确认数必须每轮可见**（承 §十一；缺它＝提案没人点 ⇒ 静默停止生长）
+    _n, _raw = _pending(root)
+    L.append("- **待确认：%s 条**%s" % (_n if _n else "（未写）",
+                                       "" if _n else " —— 速读包首行未见该字段，**如实报未写，不编数字**"))
     L.append("- **库最后更新：%s**（%s）" % (
         iso, ("今天" if days == 0 else ("%d 天前" % days)) if days >= 0 else "无数据"))
     L.append("- 索引条目：%d 件（`01-记忆档案/**`）" % nfiles)
-    L.append("- **本次由哪条接线注入：%s** —— 接线未写明 ⇒ 视为未接入。" % (via or "（未标注）"))
+    if via:
+        L.append("- **本次由哪条接线注入：%s** ⇒ 已按该接线注入（**接入认证以接入卡为准**）。" % via)
+    else:
+        L.append("- **本次接线未标注** ⇒ 按套件判据**视为未接入**。")
     L.append("- 停滞可见：若「库最后更新」长期不动 ⇒ 本库正在变旧，请提醒主人。")
+    L.append("")
+    L.append("## 五、未消费件（写了·此前无读取口 · 2026-10-02 加）")
+    L += _unconsumed(a)
     L.append("")
     L.append("> **接入与验收**：见 `docs/接入卡.md`（每宿主一页）与 `docs/接入演练.md`（两问演练）。")
 
+    L = [re.sub(r"<!--.*?-->", "", x).rstrip() for x in L]   # ★ 剥 HTML 注释（如「成熟度」标记）⇒ 原样进注入面会污染显示
     out = "\n".join(L)
     if len(L) > MAX_LINES or len(out) > MAX_CHARS:       # 硬闸：超限即截（防注入面膨胀）
         out = "\n".join(L[:MAX_LINES])[:MAX_CHARS] + "\n\n> （已按注入面上限截断）"
@@ -304,6 +386,59 @@ def selftest() -> int:
         print("[%s] §一 空 ⇒ 出 N0 提示、不抓文件头" % ("PASS" if ok9 else "FAIL"))
         bad += 0 if ok9 else 1
 
+        # ★ 2026-10-02 加（承外部评审交叉发现②：原 9 例无一触及 `_unconsumed` ⇒ 对新函数无覆盖力）
+        cases += 1
+        f8 = Path(td) / "un1"
+        (f8 / "01-记忆档案" / ".learnings").mkdir(parents=True)
+        (f8 / "01-记忆档案" / ".learnings" / "ERRORS.md").write_text(
+            "## 一、格式\n\n```markdown\n### E001. 示例\n```\n\n## 二、判据层\n\n"
+            "| # | 主题 | 判据 |\n|---|---|---|\n| **J01** | 甲 | 乙 |\n| **J02** | 丙 | 丁 |\n",
+            encoding="utf-8")
+        (f8 / "01-记忆档案" / ".learnings" / "LEARNINGS.md").write_text(
+            "```markdown\n### L001. 示例\n```\n\n### L002. 真条目\n- x\n", encoding="utf-8")
+        t9 = build(f8, "L1")
+        ok10 = ("判据层" in t9) and ("**2 条**" in t9) and ("**1 条**" in t9)
+        print("[%s] §五 剥代码块 ⇒ 示例不计、真条目计入" % ("PASS" if ok10 else "FAIL"))
+        bad += 0 if ok10 else 1
+
+        cases += 1
+        f9 = Path(td) / "un2"
+        (f9 / "01-记忆档案").mkdir(parents=True)
+        t10 = build(f9, "L1")
+        ok11 = ("五、未消费件" in t10) and ("**0 条**" in t10)
+        print("[%s] §五 缺件／空库 ⇒ 计 0 且不崩" % ("PASS" if ok11 else "FAIL"))
+        bad += 0 if ok11 else 1
+
+        cases += 1
+        f10 = Path(td) / "un3"
+        (f10 / "01-记忆档案" / "记忆工程").mkdir(parents=True)
+        (f10 / "01-记忆档案" / "记忆工程" / "carrier-events.log").write_text(
+            "broken-line\n2026-10-02T11:05:00Z | a | b | c | 首次接入 | x\n", encoding="utf-8")
+        t11 = build(f10, "L1")
+        ok12 = ("事件账" in t11) and ("**2 条**" in t11) and ("首次接入" in t11)
+        print("[%s] §五 事件账计数＋末条解析（碎行在前亦不崩）" % ("PASS" if ok12 else "FAIL"))
+        bad += 0 if ok12 else 1
+
+        cases += 1   # 2026-10-02 加（本轮改动 ③ 的覆盖例）
+        f11 = Path(td) / "un4"
+        (f11 / "01-记忆档案").mkdir(parents=True)
+        (f11 / "01-记忆档案" / "USER.md").write_text(
+            "- **称呼**：示例主人 <!-- 成熟度：已定 ｜ 来源：主人原话 -->\n- 第二行\n", encoding="utf-8")
+        t12 = build(f11, "L1")
+        ok13 = ("示例主人" in t12) and ("<!--" not in t12)
+        print("[%s] 剥 HTML 注释 ⇒ 注释不进注入面" % ("PASS" if ok13 else "FAIL"))
+        bad += 0 if ok13 else 1
+
+        cases += 1   # 2026-10-02 加（承外部评审交叉发现⑤ · 本轮改动 ②）
+        f12 = Path(td) / "un5"
+        (f12 / "01-记忆档案" / ".learnings").mkdir(parents=True)
+        (f12 / "01-记忆档案" / ".learnings" / "LEARNINGS.md").write_text(
+            "```markdown\n### L001. 示例（奇数栅栏·未闭合）\n", encoding="utf-8")
+        t13 = build(f12, "L1")
+        ok14 = "**0 条**" in t13
+        print("[%s] 未闭合栅栏 ⇒ 其后内容不计" % ("PASS" if ok14 else "FAIL"))
+        bad += 0 if ok14 else 1
+
     print("---- PASS %d / FAIL %d ----" % (cases - bad, bad))
     return 1 if bad else 0
 
@@ -326,7 +461,7 @@ def main() -> int:
         return 2
     txt = build(root, a.via)
     if a.out:
-        Path(a.out).write_text(txt, encoding="utf-8")
+        Path(a.out).write_text(txt, encoding="utf-8", newline="\n")   # ★ 2026-10-02：治 Windows 默认转 CRLF（承外部评审交叉发现④）
         print("[OK] 已写 %s（%d 行 / %d 字符）" % (a.out, len(txt.splitlines()), len(txt)))
     else:
         sys.stdout.write(txt)

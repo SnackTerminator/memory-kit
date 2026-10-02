@@ -1,6 +1,6 @@
 {
   "name": "memory-kit-dsh",
-  "version": "0.1.23",
+  "version": "0.1.32",
   "description": "memory-kit 在 DeepSeek Harness（DSH）上的接入声明 —— 形态：裸库直读（零改造）",
   "author": "Snack Terminator & 姜姜",
   "license": "MIT",

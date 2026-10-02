@@ -111,9 +111,20 @@ def main(argv=None) -> int:
                    f"AGENTS/MANIFEST {'齐' if entry else '缺'}；必读缺失 {len(missing)} 件"
                    + (f"：{'、'.join(missing)}" if missing else "")))
 
-    # ② N0 新生儿态自检
-    rc, out = run([str(KIT / "tests" / "n0_bootstrap_check.py"), "--root", str(KIT)])
-    checks.append(("② 新生儿态自检", rc == 0, out.strip().splitlines()[-1] if out.strip() else ""))
+    # ② N0 新生儿态自检（**只在「套件根」跑** —— 2026-10-02 根修）
+    #   由来（外部独立复核交叉发现 3 · 本机实测坐实）：本项语义＝「拿被测根当**套件根**冷启动一个
+    #   临时实例」，故需要 `kernel-skeleton/`。而**库根按设计不装骨架**（装了会造**第二个
+    #   `01-记忆档案/`** ⇒ 踩 `MANIFEST ⓪` 自辨判据）⇒ **在库根跑必 FAIL**＝假红。
+    #   判据＝`MANIFEST ⓪`（同目录有无 `01-记忆档案/`），与 `tools/carry_check.py` 的
+    #   `root_kind()` **同一条判据、写死同一句**（两处实现，判据不许各自演化）。
+    #   库根下**跳过并如实报「不适用」** —— **不假装通过，也不假装失败**。
+    if (root / "01-记忆档案").is_dir():
+        checks.append(("② 新生儿态自检", True,
+                       "**不适用**（本根按 `MANIFEST ⓪` 判为**库根**；该判据只对套件根有意义 —— "
+                       "库内按设计不装 `kernel-skeleton/`）"))
+    else:
+        rc, out = run([str(KIT / "tests" / "n0_bootstrap_check.py"), "--root", str(KIT)])
+        checks.append(("② 新生儿态自检", rc == 0, out.strip().splitlines()[-1] if out.strip() else ""))
 
     # ③ 四闸自检
     rc, out = run([str(KIT / "tests" / "gates_selftest.py"), "--quiet"])
