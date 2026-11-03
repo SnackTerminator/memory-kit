@@ -1,6 +1,6 @@
 {
   "name": "memory",
-  "version": "0.1.32",
+  "version": "0.1.35",
   "summary": "memory-kit 的读取路径（无常驻 · 随盘跑 · 零依赖）",
   "principles": [
     "不依赖任何常驻组件即可读",

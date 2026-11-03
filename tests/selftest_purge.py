@@ -58,7 +58,7 @@ def mkroot(base):
         encoding="utf-8")
     shutil.copyfile(root / TGT, root / "_archive" / TGT)                                            # archive-copy
     shutil.copyfile(root / TGT, root / "_meta/curation/hist/20261001T000000_cool_ab12cd.snapshot")  # hist-snapshot
-    shutil.copyfile(root / TGT, root / "01-记忆档案/条目A.md.bak_20260101_JIOOO")                    # other-copy
+    shutil.copyfile(root / TGT, root / "01-记忆档案/条目A.md.bak_20260101_HOSTB")                    # other-copy
     return root
 
 
@@ -105,7 +105,7 @@ with tempfile.TemporaryDirectory() as tmp:
     hist = list((root / "_meta/curation/hist").glob("*.snapshot"))
     ck("D2 命中副本已清：hist-snapshot（全文前像）", len(hist) == 0, str(hist))
     ck("D2 命中副本已清：other-copy（`.bak_*`）",
-       not (root / "01-记忆档案/条目A.md.bak_20260101_JIOOO").exists())
+       not (root / "01-记忆档案/条目A.md.bak_20260101_HOSTB").exists())
 
     # ── D5 不误伤 ──
     ck("D5 不误伤：对照件 `条目B.md` 内容不变", sha(root / "01-记忆档案/条目B.md") == b_before)

@@ -1,8 +1,8 @@
 # 记忆库套件（memory-kit）
 
 > **给你的 AI 助手装一套记忆** —— **随盘走、可移植、零密钥**。
-> **版本**：**0.1.32**（**「能随时带走」版** · 见同目录 `VERSION`）｜ **骨架规范**：`memory-root/2`
-> **已公开发布版＝0.1.23**（GitHub）；本版为其后**本机实测续作**（部署进库 ＋ 母体适配层 ＋ **带走自检**）｜ **CHANGELOG 逐节可查**
+> **版本**：**0.1.35**（**「判据面收口 ＋ 库根去混同」版** · 见同目录 `VERSION`）｜ **骨架规范**：`memory-root/2`
+> **已公开发布版＝0.1.32**（GitHub，2026-11-03 实测 `raw…/main/VERSION`：`memory-kit 0.1.32` / released 2026-10-02）；本版 **0.1.35** 为其后**本机续作 · 未发布**｜ **CHANGELOG 逐节可查**
 
 **若你是被派来安装的 Agent ⇒ 直接读 [`BOOTSTRAP.md`](BOOTSTRAP.md)**（人读本件即可）。
 
@@ -36,7 +36,7 @@
 python install/init_instance.py --target <你的库目录>
 # 3) 自检：确认"新生儿态"合法（不崩／不装懂／主动索要）
 python install/verify.py --root <你的库目录>
-# 4) 让你的宿主读库根 AGENTS.md（一次适配，见 spec/适配契约）
+# 4) 让你的宿主读库根 AGENTS.md（一次适配，见 `adapters/CONTRACT.md`）
 ```
 
 **首次跑完你会看到**：库根出现 `AGENTS.md` ＋ `01-记忆档案/` 骨架；**内容为空是正常的** —— 这是**合法的出生态**。

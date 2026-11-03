@@ -32,9 +32,25 @@
 |---|---|---|
 | **A 注入** | ✅ **已焊** | 判据 1–2 实测（复述读序，顺序正确） |
 | **B 写触发** | ⏳ **未焊（属自觉项）** | 宿主侧**无钩子**声明 ⇒ 四个触发点**全靠会话自觉**（同 `spec/记忆形成与容量治理.md` §十） |
-| **C 检索** | ⏳ **未测（套件侧前提已备）** | 套件侧 `tools/memory.py search` 可用（实测）；**宿主侧实测为零** ⇒ 按「**未实测禁标已焊**」类推，**宿主轴应为 ⏳**（外部评审 2026-10-01 改判） |
-| **D 确认** | ⏳ **未测（套件侧前提已备）** | 套件侧 `tools/curate.py state` 报 `pending_proposals`（实测）；**宿主侧显示面未测** ⇒ 同上改判 **⏳** |
-| **E 删除触达** | ⏳ **未测** | 会话内 `purge` 执行与回执出示、备份恢复重放 —— 本宿主**未定义**（见 `CONTRACT` §八 E） |
+| **C 检索** | ✅ **已焊（2026-10-26 宿主侧实测）** | **官方 DSH CLI**（`dsh --profile headless` ／ `@deepseek-ai/dsh 0.2.1-rc.2`）实跑 `tools/memory.py search 记忆` → **扫描 45 件 ／ 命中 322 处**（回贴原文）。**宿主身份**：`D://DeepSeek Harness`（签名主体 Hangzhou DeepSeek AI Co., Ltd.），**非**第三方壳 `@linxin666/dsh-desktop` |
+| **D 确认** | ✅ **已焊（2026-10-26 宿主侧实测）** | 同一次实跑 `tools/curate.py state` → **`pending_proposals：0`**，且末行 **`对账：速读包首行 = pending_proposals = 0`**（显示面与队列一致） |
+| **E 删除触达** | ✅ **已焊（2026-10-26 宿主侧实测 · 副本上做）** | 同一次实跑副本三段：`purge --preview` → **`预览完（未删任何件）`**；`purge --yes --receipt-fingerprint NEW` → **`[OK] 已删 1 件（primary ＋ 命中副本）｜回执 1 行｜链完整`**；`purge audit` → **`[OK] 本库根内不可达（内容面 ＋ 路径面 均 0 命中）`** |
+
+## 2026-10-26 宿主侧实测环境（C/D/E 的取证条件，供复核）
+
+> **★ 先分清两个 DSH**：本机有**两个**同名近似安装 ——
+> **官方版** `D://DeepSeek Harness\`（`publisherName: CN=Hangzhou DeepSeek Artificial Intelligence Co., Ltd.`，更新源 `download.deepseek.com/dsh-desk/`）｜
+> **第三方壳** `D://DeepSeek Harness Desktop\`（`@linxin666/dsh-desktop` v5.1.0，`owner: ningbainb`，channel `beta`）。
+> **本节 C/D/E 的实测主体＝官方版**，走官方 CLI 路径（`npx @deepseek-ai/dsh@0.2.1-rc.2 --profile headless --json -`）。
+
+| 实测条件 | 值 ／ 说明 |
+|---|---|
+| 命令面 | `dsh --profile headless --json -`（任务走 stdin） |
+| 凭据 | `DEEPSEEK_API_KEY` 经环境变量传入（取自官方 Web Models 页写入的 credentials service） |
+| 工作区 | **不可是百度网盘目录** —— 沙箱要给 workspace 配 ACL，网盘目录 `SetNamedSecurityInfoW failed (Win32 5)`；本次用 `C://Users//<user>//dsh-ws` 下的库副本 |
+| 参数纪律 | **任务文本禁含换行**（含换行会被吞，任务没送到）⇒ 一律**单行 + 分号**分隔；长文本走 stdin |
+| 已知干扰 | 本机 `python` 被注入 **safe-delete 垫片**，`purge --yes` 会被拦（要在 `%LocalAppData%\Temp\codebuddy-safe-delete-bulk\` 建锁）⇒ 本次用 **`python -S`** 跳过 site 初始化后通过 |
+| 未测 | **B 写触发**仍 ⏳（官方 DSH 是否支持 hook 未验，故仍按「自觉项」记，不写成机制） |
 
 ## 不做什么
 

@@ -70,9 +70,9 @@ def tokenize(text: str) -> list:
     return out
 
 
-def _iter_docs(root: Path):
-    """产出 (rel, text, meta)。复用 `iter_md` 的扫描面（`01-记忆档案/`，排除 `.private/`）。"""
-    for p, rel in iter_md(root):
+def _iter_docs(root: Path, face: str = "mem"):
+    """产出 (rel, text, meta)。`face` 默认 `mem` —— **倒排索引面保持原口径**（`ask`/`index` 行为不变）。"""
+    for p, rel in iter_md(root, face):
         if ".private/" in rel.replace("\\", "/"):
             continue
         text = read_text(p)
@@ -274,8 +274,21 @@ def read_text(p: Path) -> str:
         return ""
 
 
-def iter_md(root: Path):
-    base = root / kitmeta.ARCHIVE_DIR
+# ── 检索面（2026-10-26 加 · `O-148`「分索引」）────────────────────────────────
+# 由来（`bench_memory` 首跑实测）：`mem` 组 Hit@5 **100%**／`spec` 组 **0%**
+#   —— 因为扫描面写死 `kitmeta.ARCHIVE_DIR`（＝`01-记忆档案`），
+#   **规程件（`spec/`／`docs/`／`adapters/`／`AGENTS.md`／`MANIFEST.md`）结构性检不到**。
+# 取舍：**不并成一个更大面**（会把 `tests/` 夹具与 `examples/` 示例的噪声带进来），
+#   改**分面**：`mem`＝记忆面 ／ `spec`＝规程面 ／ `all`＝两面合并（`search` 默认）。
+INDEX_FACES = {
+    "mem": ("01-记忆档案",),
+    "spec": ("spec", "docs", "adapters"),
+}
+# 规程面的**根级散件**（不在这三个目录里，但属规程/入口，必须可检）
+SPEC_ROOT_DOCS = ("AGENTS.md", "MANIFEST.md", "发行物清单.md", "README.md", "BOOTSTRAP.md")
+
+
+def _walk_md(root: Path, base: Path, seen: set):
     if not base.is_dir():
         return
     for dp, dns, fns in os.walk(base):
@@ -283,7 +296,26 @@ def iter_md(root: Path):
         for fn in sorted(fns):
             if fn.lower().endswith(".md"):
                 p = Path(dp) / fn
-                yield p, p.relative_to(root).as_posix()
+                rel = p.relative_to(root).as_posix()
+                if rel not in seen:
+                    seen.add(rel)
+                    yield p, rel
+
+
+def iter_md(root: Path, face: str = "all"):
+    """按面产出 `(绝对路径, 相对路径)`。`face` ∈ `mem` / `spec` / `all`。"""
+    faces = ("mem", "spec") if face == "all" else (face,)
+    seen = set()
+    for f in faces:
+        for d in INDEX_FACES.get(f, ()):
+            for item in _walk_md(root, root / d, seen):
+                yield item
+        if f == "spec":
+            for fn in SPEC_ROOT_DOCS:
+                p = root / fn
+                if p.is_file() and fn not in seen:
+                    seen.add(fn)
+                    yield p, fn
 
 
 def cmd_get(root: Path, rel: str, as_json: bool) -> int:
@@ -308,9 +340,9 @@ def cmd_get(root: Path, rel: str, as_json: bool) -> int:
     return 0
 
 
-def cmd_search(root: Path, kw: str, layer: str, limit: int, as_json: bool) -> int:
+def cmd_search(root: Path, kw: str, layer: str, limit: int, as_json: bool, face: str = "all") -> int:
     hits, scanned = [], 0
-    for p, rel in iter_md(root):
+    for p, rel in iter_md(root, face):
         # 2026-10-01 补（外部实机测试 F5 驱动）：`.private/` 不进检索面 ——
         # 与 `MANIFEST §⑦`「陌生宿主对 .private 不出库」的约定**在实现层对齐**（原仅约定、非机制）。
         if ".private/" in rel.replace("\\", "/"):
@@ -414,7 +446,7 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd")
 
     g = sub.add_parser("get"); g.add_argument("path")
-    s = sub.add_parser("search"); s.add_argument("kw"); s.add_argument("--layer", default=""); s.add_argument("--limit", type=int, default=0)
+    s = sub.add_parser("search"); s.add_argument("kw"); s.add_argument("--layer", default=""); s.add_argument("--limit", type=int, default=0); s.add_argument("--index", choices=["mem", "spec", "all"], default="all")
     k = sub.add_parser("ask"); k.add_argument("query"); k.add_argument("--layer", default=""); k.add_argument("--top-k", type=int, default=10); k.add_argument("--level", choices=["session", "doc", "line"], default="session")
     i = sub.add_parser("index"); i.add_argument("--dry-run", action="store_true"); i.add_argument("--level", choices=["doc", "line"], default="line")
     l = sub.add_parser("list"); l.add_argument("--layer", default="")
@@ -433,7 +465,7 @@ def main(argv=None) -> int:
     if a.cmd == "get":
         return cmd_get(root, a.path, a.json)
     if a.cmd == "search":
-        return cmd_search(root, a.kw, a.layer, a.limit, a.json)
+        return cmd_search(root, a.kw, a.layer, a.limit, a.json, getattr(a, "index", "all"))
     if a.cmd == "ask":
         return cmd_ask(root, a.query, a.layer, a.top_k, a.level, a.json)
     if a.cmd == "index":

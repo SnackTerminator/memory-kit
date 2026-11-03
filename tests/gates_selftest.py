@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""四闸联动自检 —— 一次跑齐全部闸的 `--selftest`（设计件 §6.1）。
+"""六闸联动自检 —— 一次跑齐全部闸的 `--selftest`（设计件 §6.1）。
 
 规则：**顺序跑，任一红即整批红**；★ **`rc=0` 不作数** ⇒ 每闸须**点名观察对象**
 （各闸自检内已打印「态数」与实测值，本编排逐闸回显并要求 `全绿` 字样在场）。
 
 用法：
-  python tests/gates_selftest.py            # 跑齐五支
+  python tests/gates_selftest.py            # 跑齐 7 支
   python tests/gates_selftest.py --selftest # 本编排自身的自检（必红例）
 
 退出码：0 全绿 ｜ 1 有红 ｜ 3 参数/IO 错
@@ -24,6 +24,9 @@ GATES = (
     ("闸③ 寿命闸", "tools/ttl_sweep.py"),
     ("闸④·a 合并闸", "tools/dedup_scan.py"),
     ("闸④·b 指针闸", "tools/pointer_check.py"),
+    # ★ 2026-10-04 加（落地率议题三方评审合并裁定 §五-5）：判据层 J10／J13 的两个新落闸。
+    ("闸⑤ J10 计数口径", "tests/number_claim_check.py"),
+    ("闸⑥ J13 改前快照", "tests/pre_change_snapshot.py"),
 )
 GREEN = re.compile(r"selftest\s*全绿（(\d+)\s*态）")
 
@@ -65,7 +68,7 @@ def main(argv=None) -> int:
     if a.selftest:
         return selftest()
 
-    print(f"==== 四闸联动自检 ｜ 套件根：{KIT}")
+    print(f"==== 六闸联动自检 ｜ 套件根：{KIT}")
     rows, red = [], 0
     for label, rel in GATES:
         lb, rc, states, out = run_gate(label, rel)
@@ -80,7 +83,7 @@ def main(argv=None) -> int:
     print("\n==== 汇总（点名观察对象：每闸自检态数）")
     for lb, flag, rc, states in rows:
         print(f"  [{flag}] {lb}  rc={rc}  自检态数={states}")
-    print(f"==== 结果：{'全绿 ⇒ 四闸可用' if red == 0 else '有红 ⇒ 四闸未达标'}（红 {red} 项）")
+    print(f"==== 结果：{'全绿 ⇒ 六闸可用' if red == 0 else '有红 ⇒ 六闸未达标'}（红 {red} 项）")
     return 0 if red == 0 else 1
 
 

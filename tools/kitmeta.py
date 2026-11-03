@@ -108,20 +108,78 @@ def load_conf(root: Path):
     return conf, CONF_NAME
 
 
+# ── 章节模式（2026-10-25 加 · 治「四闸零对象」，`O-145`）──────────────────────
+# 由来（实测）：`iter_l2` 只认 `layer:` frontmatter 的件，而**真实记忆的真源形态是
+#   「一个大 md 里若干 `## E823`／`## L1206` 章节」**（宿主侧 `ERRORS.md` 536 条 ＋
+#   `LEARNINGS.md` 329 条，**带 layer 字段的件 = 0**）⇒ 四闸看的是 **0 条**，
+#   而真实可检查对象 **865 条**。
+# 判据取舍：**不复制文件**（复制＝造第二份真源，违「减副本」），改让读取面**认章节**。
+# 触发面收窄（防波及）：**只对 `.learnings/` 下的 `ERRORS.md`／`LEARNINGS.md`**，
+#   且**仅在没有 frontmatter layer 时**才走章节模式 ⇒ 其他件零影响。
+SECTION_FILES = ("ERRORS.md", "LEARNINGS.md")   # 单册原名件（常量名保留，防外部引用断）
+# ★ 2026-10-26 加 · `O-145`「分册」：分册件（`ERRORS_02.md`／`LEARNINGS_03.md`）与原名件
+#   **同权走章节模式**。理由：分册的目的是「**每册各自不超上限**」，不是「把旧条目藏起来」
+#   —— 冷册若不被看见，则既丢检索面（记忆变少），四闸又退回「零对象」（`O-145` 原病）。
+SECTION_PREFIXES = ("ERRORS", "LEARNINGS")
+
+
+def _is_section_file(fn: str) -> bool:
+    """`.learnings` 大件的「册」判定（原名件 ＋ 分册件同权；备份/冲突件不算）。
+
+    判据：`<前缀>.md` 或 `<前缀>_<任意>.md`。`ERRORS.md.bak_…` / `ERRORS.md.corrupted_…`
+    因不以 `.md` 结尾而天然排除。
+    """
+    if not fn.lower().endswith(".md"):
+        return False
+    stem = fn[:-3]
+    return any(stem == p or stem.startswith(p + "_") for p in SECTION_PREFIXES)
+SNAPSHOT_MARKERS = ("快照", "归档", "_hist")   # 历史副本目录，不计入 L2 条目数
+# 编号位数取 \d{2,4}：**早期条目是两位编号**（`L10`–`L99` 共 61 条），
+# 首版写 \d{3,4} 把它们整批漏掉（实测 259 → 320）⇒ 口径必须从宽。
+SECTION_RE = re.compile(r"^(#{2,4})\s+([EL]\d{2,4})\b(.*)$", re.M)
+
+
+def split_sections(body: str, rel: str):
+    """把大件切成 [(meta, 段正文), ...]；无章节则返回空表。"""
+    marks = list(SECTION_RE.finditer(body))
+    out = []
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(body)
+        seg = body[m.start():end]
+        sid = m.group(2)
+        # `family` 用来分组（去重闸按 family 归族）；`id`／`source` 供指针闸与审计定位
+        out.append(({"layer": "L2", "id": sid, "source": "%s#%s" % (rel, sid),
+                     "family": "err" if sid[0] == "E" else "learn"}, seg))
+    return out
+
+
 def iter_l2(root: Path):
-    """产出 (绝对路径, 相对路径, meta, 正文)。只认带 layer 字段的件。"""
+    """产出 (绝对路径, 相对路径, meta, 正文)。
+
+    **两条来源**：① 带 `layer` frontmatter 的件（原行为，不变）
+    ② **`ERRORS.md`／`LEARNINGS.md` 里的 `E#`／`L#` 章节**（2026-10-25 加，见上）。
+    """
     base = root / ARCHIVE_DIR
     if not base.is_dir():
         return
     for dp, dns, fns in os.walk(base):
-        dns[:] = [d for d in dns if not d.startswith("_") and d != "__pycache__"]
+        # ★ 2026-10-25 加：**排除快照/归档目录** —— 那里是历史副本，
+        #   计进 L2 条目数会让「四闸对象数」虚高（实测：宿主侧扫到
+        #   `记忆工程快照/2026-09-27_周快照/.learnings/` 的旧副本）。
+        dns[:] = [d for d in dns if not d.startswith("_") and d != "__pycache__"
+                  and not any(k in d for k in SNAPSHOT_MARKERS)]
         for fn in sorted(fns):
             if not fn.lower().endswith(".md"):
                 continue
             p = Path(dp) / fn
             meta, body, _txt = read_meta(p)
+            rel = p.relative_to(root).as_posix()
             if "layer" in meta:
-                yield p, p.relative_to(root).as_posix(), meta, body
+                yield p, rel, meta, body
+                continue
+            if _is_section_file(fn):                     # ← 章节模式（原名件 ＋ 分册件）
+                for m2, seg in split_sections(body, rel):
+                    yield p, rel, m2, seg
 
 
 def ttl_state(meta: dict, today=None, default_days=None):

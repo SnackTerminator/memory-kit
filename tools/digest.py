@@ -225,8 +225,26 @@ def _unconsumed(a: Path) -> list:
             if len(parts) >= 5:
                 e_last = "%s · %s" % (parts[0][:10], parts[4])
 
+    # ★ 2026-10-04 加（落地率裁定 §五-6 · 治「约定无落点」无输出面）：
+    #   把 §三「载体」列的覆盖率算出来 ⇒ 「无载体 0」才允许说「已收口」。
+    _cp = le / "ERRORS.md"
+    _tot = _filled = _self = 0
+    if _cp.is_file():
+        for _m in re.finditer(r"^\|\s*\*\*J\d\d\*\*\s*\|(.+)\|\s*$",
+                              _cp.read_text(encoding="utf-8", errors="replace"), re.M):
+            _car = [c.strip() for c in _m.group(1).split("|")][-1]
+            _tot += 1
+            if _car:
+                _filled += 1
+                if "自觉" in _car:
+                    _self += 1
+    _carrier = ("- 判据层载体（§三「载体」列）：**约定 %d ｜有载体 %d ｜自觉项 %d ｜无载体 %d**"
+                "（无载体须为 0，>0 ⇒ 不许称「已收口」）"
+                % (_tot, _filled, _self, _tot - _filled))
+
     return [
         "- 判据层 `ERRORS.md` **%d 条**（`J##`）｜方法 `LEARNINGS.md` **%d 条**｜来源归因 `SEED.md` **%d 行**" % (j, l, s),
+        _carrier,
         "- 事件账 `carrier-events.log` **%d 条**（末条 %s）" % (e_cnt, e_last),
     ]
 

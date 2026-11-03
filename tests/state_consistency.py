@@ -47,6 +47,19 @@ JUNK_DIRS = ("__pycache__",)
 #   在两处目标行上已不再命中（保留空豁免即「机制走一半」：会让将来的强断言误借旧豁免通过）。
 KNOWN_EXCEPTIONS = ()
 
+# ★ 2026-11-03 加（`O-154`）：**库根**（非套件根）下，I 层实例目录不进「文档面」判据（⑤⑥）。
+#   理由：⑤ 强断言／⑥ 版本串 的对象是**发行文档面**；实例台账 `.learnings` 属历史记录、
+#   `08-检索索引`／`_meta` 属可重建派生物，其内出现旧版本号或历史强断言是**正常的**
+#   （与 `CHANGELOG.md`、`发行物清单.md` 被 ⑥ 排除同一个理由）。
+#   缺此项的实害：①④ 自 2026-10-26 起已认库根，⑤⑥ 不认 ⇒ **同一闸两套标准**，在 `记忆库`
+#   恒红 2 项（`ERRORS.md:1263` 强断言 ＋ 3 处停旧版本串）。代码自己写着「恒红的闸＝没信号」。
+I_LAYER_PREFIX = ("01-记忆档案/", "02-工作日志/", "08-检索索引/", "_meta/")
+
+
+def _skip_i_layer(kit: Path, rel: str) -> bool:
+    """库根才跳 I 层；**套件根不跳**（发行包内若出现这些路径，白名单判据①已先红，这里不越权）。"""
+    return (not _is_kit_root(kit)) and rel.replace("\\", "/").startswith(I_LAYER_PREFIX)
+
 
 def _read(p: Path) -> str:
     try:
@@ -88,6 +101,17 @@ def v_json_version(p: Path):
     return m.group(1) if m else None
 
 
+def _is_kit_root(kit: Path) -> bool:
+    """**套件根判据**（与 `MANIFEST ⓪` / `install/verify.py ②` **同一条**）：
+    套件根带 `kernel-skeleton/`；**库根按设计不装骨架**（装了会在库内造第二个
+    `01-记忆档案/` ⇒ 踩 `MANIFEST ⓪`）⇒ 两条判据在库根须**豁免**：
+      ① 库根 `README.md` 是「**本库怎么用**」篇（白名单件），**按设计不含套件版本号**；
+      ④ 白名单里的 `examples/` 与 `kernel-skeleton/` **库根本来就不装**。
+    **2026-10-26 加**（`O-132` 打包前置）：原两条对库根**恒红**，而「恒红的闸＝没信号」。
+    """
+    return (kit / "kernel-skeleton").is_dir()
+
+
 def check_versions(kit: Path):
     got = {"VERSION": v_version(kit), "CHANGELOG": v_changelog(kit),
            "README": v_readme(kit), "发行物清单": v_manifest(kit)}
@@ -101,6 +125,9 @@ def check_versions(kit: Path):
         _v = v_json_version(kit.joinpath(*rel))
         if _v:
             got[label] = _v
+    if not _is_kit_root(kit):
+        # 库根：README 面按设计不适用（见 `_is_kit_root` 说明）
+        got.pop("README", None)
     miss = [k for k, v in got.items() if not v]
     vals = {v for v in got.values() if v}
     if miss:
@@ -176,6 +203,14 @@ def check_whitelist_paths(kit: Path):
     if not wl:
         return False, "白名单解析为空（检查 `发行物清单.md` §一 围栏块）"
     missing = [r for r in wl if not (kit / r).is_file()]
+    if missing and not _is_kit_root(kit):
+        # 库根豁免面：这两类**按设计不进库根**（`examples/` 给人看、`kernel-skeleton/` 会造第二个 01）
+        exempt = ("examples/", "kernel-skeleton/")
+        still = [r for r in missing if not r.replace("\\", "/").startswith(exempt)]
+        if not still:
+            return True, ("白名单 %d 件：库根豁免 %d 件（examples/ 与 kernel-skeleton/ 按设计不装），真缺失 0"
+                          % (len(wl), len(missing)))
+        missing = still
     if missing:
         return False, "白名单声明但缺失 %d 件：%s" % (len(missing), missing[:8])
     return True, "白名单 %d 件全部在位" % len(wl)
@@ -192,6 +227,8 @@ def check_claims(kit: Path):
                 continue
             p = Path(dp) / f
             rel = p.relative_to(kit).as_posix()
+            if _skip_i_layer(kit, rel):
+                continue
             lines = _read(p).splitlines()
             for i, ln in enumerate(lines, 1):
                 if not any(w in ln for w in CLAIM_WORDS):
@@ -230,6 +267,9 @@ def check_doc_version_strings(kit: Path):
                 continue
             p = Path(dp) / f
             scanned += 1
+            if _skip_i_layer(kit, p.relative_to(kit).as_posix()):
+                scanned -= 1
+                continue
             for i, ln in enumerate(_read(p).splitlines(), 1):
                 for m in VERSTR_RE.finditer(ln):
                     if m.group(1) != cur:

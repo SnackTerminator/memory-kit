@@ -19,3 +19,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## 关于本文件与「记忆」的关系（**非官方补充说明**）
+
+本套件采用 MIT，与 `adapters/*/manifest.json` 中已有的 `license` 声明一致。
+
+**两条边界（重要）**：
+
+1. **本许可覆盖「套件」** —— 即 `spec/` `docs/` `tools/` `install/` `tests/` `adapters/CONTRACT.md` 及库根规范件。
+2. **本许可不覆盖「记忆」** —— `01-记忆档案/` 内的内容（红线／画像／事件账／当日面等）属于**使用者**，**不随套件分发**（见 `发行物清单.md`）。使用者对自己记忆的处置**由使用者自己决定**，与本许可无关。
+
+> 第 2 条不是法律条款，是本项目的分发约定。实际执行靠 `tests/zero_private_scan.py` 两道判据（白名单 ＋ 内容扫描）。

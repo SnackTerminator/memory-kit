@@ -13,6 +13,7 @@
 """
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -38,9 +39,21 @@ def run(args):
 # 但会让"记录了却不生效"（护栏不写 ⇒ 教训防不住复发；来源不写 ⇒ 分不清谁说的）。
 ENTRY_MARK = "## 二、实际条目区"
 LEARN_FIELDS = {
-    "ERRORS.md": ("**护栏**", "**来源**"),
-    "LEARNINGS.md": ("**来源**", "**被引用过**"),
+    "ERRORS.md": ("护栏", "来源"),
+    "LEARNINGS.md": ("来源", "被引用过"),
 }
+
+
+def _has_field(blk: str, name: str) -> bool:
+    """字段在位判据 —— **认「裸字段」与「带括注」两种写法**。
+
+    ★ 2026-10-25 修假红（`E823` 族：断言面向「字面」而非「语义」）：
+      原判据是字面 `"**护栏**" in blk`，于是把
+      `- **护栏（已落 · 改的是机制不是纪律）**：` 判成「缺字段」——
+      **内容明明写了、还比裸字段写得更细，却报 WARN**。
+      报错方向也错：该报的是「没写护栏」，它报成了「格式不合我的口味」。
+    """
+    return re.search(r"\*\*" + re.escape(name) + r"(?:[（(][^*\n]*[）)])?\*\*", blk) is not None
 
 
 def _entries(text: str):
@@ -70,7 +83,7 @@ def check_learnings(root: Path):
             continue                      # 缺件由别处管；这里只查字段
         for blk in _entries(f.read_text(encoding="utf-8", errors="replace")):
             head = blk.splitlines()[0].strip()
-            missing = [fd for fd in fields if fd not in blk]
+            missing = [fd for fd in fields if not _has_field(blk, fd)]
             if missing:
                 warns.append(f"{fn} `{head}` 缺字段：{'、'.join(missing)}")
 
@@ -89,6 +102,28 @@ def check_learnings(root: Path):
             warns.append("MANIFEST「① 本轮必读」段含 `.learnings/` ⇒ 经验库被列入开局必读"
                          "（其中「外部注入」条目会随每次会话注入 ⇒ 违投毒防线 #3）")
     return warns
+
+
+# ── ⑦ 数据面体检（2026-10-25 加 · 治 `E823`「假绿」）────────────────────────
+# 由来（本机实测）：同一库根上 `verify` 报「✅ 能用」，而 `tests/state_consistency.py`
+#   报「RED 2（禁物 42 处）」—— 两条命令结论相反，而移植者只会跑前者。
+#   根因：③ 跑的是「四闸**自身 selftest**」（脚本能不能跑），不是「库脏不脏」。
+#   本项**不把脏件判成"不能用"**（`.bak` 不影响读取，判 FAIL 是另一种假红），
+#   而是**取消"纯 ✅"这个结论**：结构全过但库不干净 ⇒ 报「⚠ 能用，但库不干净」。
+DIRTY_PATTERNS = ("*.bak*", "*.corrupted*", "*.tmp", "*.orig", "*.rej")
+
+
+def check_dirty(root: Path):
+    """返回库内「运行态／备份类」件清单（相对路径）；空 = 干净。"""
+    hits = []
+    for pat in DIRTY_PATTERNS:
+        for p in root.rglob(pat):
+            if p.is_file():
+                hits.append(str(p.relative_to(root)).replace("\\", "/"))
+    for p in root.rglob("__pycache__"):
+        if p.is_dir():
+            hits.append(str(p.relative_to(root)).replace("\\", "/") + "/")
+    return sorted(set(hits))
 
 
 def main(argv=None) -> int:
@@ -141,9 +176,12 @@ def main(argv=None) -> int:
     # ⑥ 学习件字段自检（WARN 级：不阻断"能用"，但必须出声）
     warns = check_learnings(root)
 
+    # ⑦ 数据面体检（脏件 ⇒ 取消"纯 ✅"结论，但不判"不能用"）
+    dirty = check_dirty(root)
+
     ok = all(c[1] for c in checks)
     if a.json:
-        print(json.dumps({"root": str(root), "usable": ok, "warns": warns,
+        print(json.dumps({"root": str(root), "usable": ok, "warns": warns, "dirty": dirty,
                           "checks": [{"name": n, "pass": p, "note": d} for n, p, d in checks]},
                          ensure_ascii=False))
     else:
@@ -156,8 +194,15 @@ def main(argv=None) -> int:
             print(f"        · {w}")
         if warns:
             print("        （WARN 不阻断使用；处置口径见 spec/记忆形成与容量治理.md §九）")
-        print(f"==== 结论：{'✅ 能用' if ok else '❌ 不能用（先按上面的 FAIL 项处置，见 docs/TROUBLESHOOTING.md）'}"
+        verdict = ("❌ 不能用（先按上面的 FAIL 项处置，见 docs/TROUBLESHOOTING.md）" if not ok
+                   else ("⚠ **能用，但库不干净**" if dirty else "✅ 能用"))
+        print(f"==== 结论：{verdict}"
               + (f"（另有 {len(warns)} 条 WARN，见上）" if warns else ""))
+        if dirty:
+            print(f"  [WARN] ⑦ 数据面体检  —— 运行态/备份类件 {len(dirty)} 处"
+                  "（不阻断读取，但违 `MANIFEST §⑤-4`「运行态不进库根」）")
+            print(f"        · {'、'.join(dirty[:6])}{' …' if len(dirty) > 6 else ''}")
+            print("        · 处置：移入 `_run/_hist/` 或删除；口径见 spec/记忆形成与容量治理.md §九")
     return 0 if ok else 1
 
 

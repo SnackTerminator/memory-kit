@@ -165,9 +165,32 @@ def drive_raw(root: Path) -> str:
         return '未判（非 Windows 且 /proc/mounts 不可读）'
 
 
+SYNC_DIR_MARKS = ('baidusyncdisk', 'baidutongbu', 'baidunetdisk', 'onedrive',
+                  'nutstore', '坚果云', 'dropbox', 'googledrive', 'icloud',
+                  'weiyun', '微云', 'syncthing')     # 2026-10-03 加（项2）
+
+
+def sync_mark(root: Path) -> str:
+    """路径名**同步盘/网盘目录**特征命中（小写比较）。
+
+    2026-10-03 加（项2 · 治「判库为『本地固定盘』⇒ 抓不出网盘载体违规」）：
+    Windows `GetDriveTypeW` 只报**盘符物理类型** —— 同步盘目录（形如 `<同步根>`）报「本地固定盘」，
+    但语义上是**网盘同步目录**（拔盘即断，≠ 可拔载体）⇒ 两处结论打架即由此而来。
+    """
+    p = str(root).lower()
+    for m in SYNC_DIR_MARKS:
+        if m in p:
+            return m
+    return ''
+
+
 def drive_kind(root: Path) -> str:
     """盘形归类（给判读用）—— **「能带走吗」的实面。**"""
     r = drive_raw(root)
+    sm = sync_mark(root)
+    if sm:
+        return ('%s ｜ ★ **网盘同步目录**（路径特征 `%s`）⇒ **不是可拔载体**：'
+                '拔盘即断／换机须重新同步 ⇒ 禁当「能带走」介质使用' % (r, sm))
     if '可移动' in r or '外置' in r or 'FUSE' in r or '光驱' in r:
         return r + '  → ★ **能带走**'
     if '网络' in r or 'NFS' in r or 'SMB' in r:
@@ -242,6 +265,7 @@ def main(argv=None) -> int:
         'env': {
             'drive_kind': drive_kind(root),
             'drive_raw': drive_raw(root),
+            'sync_mark': sync_mark(root),
             'MEMORY_KIT_DATA': os.environ.get('MEMORY_KIT_DATA') or None,
             'MEMORY_KIT_LIB': os.environ.get('MEMORY_KIT_LIB') or None,
             'cwd': os.getcwd(),
@@ -299,7 +323,7 @@ def main(argv=None) -> int:
              result['env']['MEMORY_KIT_DATA'] or '（未设 · 走载体优先降级）',
              result['env']['MEMORY_KIT_LIB'] or '（未设）'))
     print('      ⇒ 盘形判读：**能带走**＝外置/移动盘；**换环境即断**＝网络盘；'
-          '本地盘随机器走（备份另算）')
+          '本地盘随机器走（备份另算）｜**网盘同步目录**＝拔盘即断、跨机靠同步（2026-10-03 加）')
 
     bad = bool(miss_refs) or (have_base and any(diffs.values())) or (not have_base and not a.write_baseline)
     print('== 结论：%s' % ('⚠️ 有待处理项（见上）' if bad else '✅ 可带走 / 已完整接上'))

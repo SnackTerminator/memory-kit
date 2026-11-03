@@ -52,7 +52,7 @@ def main():
 
         rc, out = run(["append", "--root", str(tmp), "--action", "cool",
                        "--target", "01-记忆档案/条目A.md", "--frm", "active", "--to", "cooled",
-                       "--operator", "姜姜", "--proposal-id", "P-1", "--snapshot", str(item)])
+                       "--operator", "operator-X", "--proposal-id", "P-1", "--snapshot", str(item)])
         check("append 成功", rc == 0, out[:250])
         # 判据 2：起草/追加不动记忆正文
         check("判据2 不动记忆正文（md5 不变）", md5(item) == before, f"before={before} after={md5(item)}")
@@ -73,7 +73,7 @@ def main():
 
         rc, _ = run(["append", "--root", str(tmp), "--action", "retire",
                      "--target", "01-记忆档案/条目A.md", "--frm", "cooled", "--to", "archived",
-                     "--operator", "姜姜", "--proposal-id", "P-2"])
+                     "--operator", "operator-X", "--proposal-id", "P-2"])
         rc2, out2 = run(["verify", "--root", str(tmp)])
         check("两行链条完整", rc2 == 0, out2[-250:])
 

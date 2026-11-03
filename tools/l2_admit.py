@@ -133,6 +133,12 @@ def main(argv=None) -> int:
     for p, rel, meta, _body in kitmeta.iter_l2(root):
         if str(meta.get("layer", "")).strip() != "L2":
             continue
+        # 2026-11-02 修：章节模式（ERRORS.md/LEARNINGS.md 的 E#/L# 段）＝ L1 事件日志，
+        # 结构上无 per-section frontmatter，承载不了准入三问 ⇒ 不进 L2 入口闸。
+        # 修前：483 条章节全被当 L2 查、全 FAIL（三问齐备 0 件）。
+        # 依据：spec §254（ERRORS/LEARNINGS 是 L1 事件落点）＋ 外部实践（一条目＝一文件＋frontmatter）。
+        if "#" in str(meta.get("source", "")):
+            continue
         n_l2 += 1
         m = judge(meta)
         if m:

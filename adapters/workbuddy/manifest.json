@@ -1,6 +1,6 @@
 {
   "name": "memory-kit-workbuddy",
-  "version": "0.1.32",
+  "version": "0.1.35",
   "description": "memory-kit 在 WorkBuddy（母体）上的接入声明 —— 形态：接线注入（宿主钩子挂桥，不改内核）",
   "author": "Snack Terminator & 姜姜",
   "license": "MIT",
@@ -23,17 +23,18 @@
   },
   "verified": {
     "date": "2026-10-02",
-    "method": "库内实测：deploy → tests/gates_selftest.py --quiet → install/verify.py --root → tools/memory.py index/search → I 层 md5 前后比对",
+    "updated": "2026-10-03",
+    "method": "库内实测：deploy → tests/gates_selftest.py --quiet → install/verify.py --root → tools/memory.py index/search → I 层 md5 前后比对；**2026-10-03 追加**：宿主侧 `memory_bridge --selftest`（**6/6**）＋ 库内 `install/verify.py`（**6/6 全 OK**）",
     "criteria": {
       "1_can_read": "PASS —— 桥注入成功，digest 正常输出",
-      "2_read_order": "PARTIAL —— 走摘要注入非逐件读 6 件；读序由 MANIFEST 规约、digest 实现",
+      "2_read_order": "PARTIAL —— 走摘要注入（digest ＋ AGENTS/TOOLS）非逐件读 6 件；读序由 MANIFEST 规约、digest 实现。**2026-10-03**：AGENTS 默认走 **brief 瘦身档**（目录＋关键信号），实测注入面 **24,517 → 18,501 B／会话**；`TOOLS.md` 保持全文",
       "3_no_cache_drift": "PASS —— 改库内件重跑 digest 即出新内容",
       "4_no_daemon_needed": "PASS —— 每事件起一次进程；套件侧 0 处服务/网络调用",
       "5_coexist": "PASS —— 宿主注入位（43,712 B）与库内（12,271 B）两版互不覆盖",
       "6_physical_separation": "PASS —— F 层已装进库；记忆只在 01-记忆档案/",
-      "7_carrier_change_detectable": "PARTIAL —— 事件账已落 2 行；宿主侧无持久 h_<uuid> 生成器 ⇒ 靠会话自觉"
+      "7_carrier_change_detectable": "**PASS**（2026-10-03 由 PARTIAL 转）—— 宿主侧**已有持久代号生成器**：`memory_bridge.host_ids()` **首铸即落盘** `_run/memory_bridge_ids.json`，实测 `h_da7ca20fdbd8`／`m_9a24ae90b726`，二次调用同值；`--where` 自证。事件账已落 3 行"
     },
-    "knownDefect": "库内跑 install/verify.py 的第②项（新生儿态自检）必 FAIL —— 该判据要求以库根为套件根冷启动、需 kernel-skeleton/，而库内按设计不装骨架（装了会造第二个 01-记忆档案 ⇒ 踩 MANIFEST ⓪）。正解＝判据侧识别「库根」，属套件待办。",
-    "note": "**已连入两个宿主**（Hermes 裸库直读 ＋ WorkBuddy 桥注入）—— G4 判据②「≥2 异构宿主」在**形态**上更全（裸读＋注入两种接入面）"
+    "knownDefect": "**已闭 —— 2026-10-03 实测**。原文：「库内跑 install/verify.py 的第②项（新生儿态自检）必 FAIL」。现况＝`[OK] ② 新生儿态自检 —— **不适用**（本根按 MANIFEST ⓪ 判为**库根**）` ⇒ **判据侧已识别库根，不再 FAIL**；原「正解」已在实现里，故**该待办已闭**。原文保留作沿革。",
+    "note": "**已连入宿主**：Hermes 裸库直读 ＋ WorkBuddy 桥注入（母体）＋ **WorkBuddy 1号机（2026-10-03 装 L1）** —— G4 判据②「≥2 异构宿主」在**形态**上更全（裸读＋注入两种接入面）。1号机代号见判据 7。"
   }
 }

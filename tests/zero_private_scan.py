@@ -26,7 +26,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-TEXT_EXT = {"", ".md", ".txt", ".py", ".json", ".toml", ".yaml", ".yml", ".cfg", ".ini", ".csv"}
+TEXT_EXT = {"", ".md", ".txt", ".py", ".json", ".toml", ".yaml", ".yml", ".cfg", ".ini", ".csv", ".allow"}
+# ★ 2026-11-03 补 `.allow`（`O-158` · 外部评审实测抓出）：`tests/f_layer_sync.allow` 的**注释行**
+#   原本把本机机位名与账号名印了出来，而本集合不含 `.allow` ⇒ 判据② 内容扫描**结构性跳过**该件
+#   （`p.suffix.lower() not in TEXT_EXT` 在下方两处调用）⇒ **包内唯一不被扫描的文本件**。
+#   教训：**扫描覆盖面本身就是判据的一部分** —— 白名单件只要后缀不在本集合里，就是"过了闸但没被查"。
 SKIP_DIRS = {".git", "__pycache__", ".idea", ".vscode", ".mypy_cache", ".pytest_cache"}
 MANIFEST_NAME = "发行物清单.md"
 NGRAM_N = 16
@@ -98,6 +102,12 @@ def check_whitelist(root: Path):
 # ---------------------------------------------------------------- 判据 ② 内容
 
 def load_keywords(kwfile: Path):
+    """读词表。**★ 2026-10-04 加空表断言（E718）**。
+
+    实测教训：给了词表文件但**格式不被 `parse_fenced_list` 识别**时（缺 `## 一、词表` 围栏块、
+    传了逗号串、传了纯文本行），本函数返回 `[]`，而调用方把「空表」当「无关键词可扫」⇒
+    **扫了 0 条却报 `[OK] 通过`**（判据空转）。本函数现**不判空**，由 `main` 统一断言并 `return 3`。
+    """
     return [norm(x) for x in parse_fenced_list(kwfile, "## 一、词表")] if kwfile else []
 
 
@@ -308,6 +318,20 @@ def selftest() -> int:
         _kw2, ng5, _sc, _n2, _ts2, _st2 = check_content(d5, [], rf5)
         cases.append(("态5【阳性对照】逐字同源（不含关键词）应被检出", len(ng5) >= 1))
 
+        # ★ 态6（2026-10-04 补 · E718 负向样本）：**格式不合的词表 ⇒ 解析为空 ⇒ main 须 rc=3**
+        #     「给了文件但解析为空」这条路径，实测曾静默报 [OK] 通过。
+        import tempfile as _tf
+        _td = _tf.mkdtemp(prefix="zps6_")
+        _pkg = Path(_td) / "pkg"; _pkg.mkdir(parents=True, exist_ok=True)
+        _make_pkg(_pkg, ["a.md"])
+        _badkw = Path(_td) / "kw.md"
+        _badkw.write_text("alpha,bravo,charlie\n", encoding="utf-8")  # 逗号串：parse_fenced_list 认不出
+        try:
+            _rc = main(["--root", str(_pkg), "--content", "--keywords", str(_badkw)])
+            cases.append(("态6【E718 负向】格式不合的词表须 rc=3（禁静默通过）", _rc == 3))
+        finally:
+            shutil.rmtree(_td, ignore_errors=True)
+
     ok = True
     for name, res in cases:
         print(f"  [{'OK' if res else 'FAIL'}] {name}")
@@ -323,7 +347,9 @@ def main(argv=None) -> int:
     ap.add_argument("--root", default=None, help="发行包根目录（默认：本脚本上一级）")
     ap.add_argument("--whitelist", action="store_true", help="只跑判据①")
     ap.add_argument("--content", action="store_true", help="只跑判据②")
-    ap.add_argument("--keywords", default=None, help="关键词表件（私人件，永不落包）")
+    ap.add_argument("--keywords", default=None,
+                    help="关键词表件（私人件，永不落包）｜**须含 `## 一、词表` 标题 ＋ 围栏代码块**；"
+                         "格式不合将 rc=3 判为「无法执行」（**不静默通过**，E718）")
     ap.add_argument("--private-ref", default=None, help="私有参照目录（n-gram 交叉用）")
     ap.add_argument("--json", action="store_true", help="机器可读输出")
     ap.add_argument("--ngram-warn", action="store_true",
@@ -331,7 +357,7 @@ def main(argv=None) -> int:
                          "见 spec §七；本开关仅供排查时降噪）")
     ap.add_argument("--strict-ngram", action="store_true",
                     help="[已废弃·保留兼容] 同 --ngram-warn 的反面（默认即 FAIL，故本开关现为无操作）")
-    ap.add_argument("--selftest", action="store_true", help="五态自检（含阳性对照）")
+    ap.add_argument("--selftest", action="store_true", help="六态自检（含阳性对照 ＋ E718 负向）")
     a = ap.parse_args(argv)
 
     if a.selftest:
@@ -378,6 +404,19 @@ def main(argv=None) -> int:
             ct_skipped = True
         else:
             kws = load_keywords(kwfile) if kwfile else []
+            # ★ 2026-10-04 空表断言（E718）：**给了词表却解析出 0 条 = 无法执行**，不是「无关键词可扫」。
+            #     治「扫了 0 条却报 [OK] 通过」的判据空转。refdir 单独给时（纯 n-gram 模式）不适用。
+            if kwfile and not kws:
+                print(f"[FAIL] 词表解析为空：{kwfile}")
+                print("       ⇒ **判据② 判为「无法执行」而非「通过」**（E718）。")
+                print("       词表须是含 `## 一、词表` 标题的 Markdown，其下用围栏代码块逐行列词：")
+                print("       ## 一、词表")
+                print("       ```")
+                print("       关键词1")
+                print("       关键词2")
+                print("       ```")
+                report["content"] = {"executed": False, "reason": "empty_keyword_table"}
+                return 3
             kw_hits, ng_hits, scanned, n_overlap, too_short, st = check_content(root, kws, refdir)
             print(f"-- 判据② 内容：扫描 {scanned} 件 ｜ 关键词 {len(kws)} 条 ｜ 命中 {len(kw_hits)} ｜ "
                   f"参照采样（关键词窗口 {st['ref_win']} ／ 长行 {st['ref_lines']}）｜ "

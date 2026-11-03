@@ -38,13 +38,21 @@ def evaluate(items, conf):
     max_items = int(conf.get("L2_MAX_ITEMS", kitmeta.DEFAULTS["L2_MAX_ITEMS"]))
     max_chars = int(conf.get("L2_MAX_CHARS", kitmeta.DEFAULTS["L2_MAX_CHARS"]))
 
+    # ★ 2026-10-26 改判 · `O-145`「分册」：口径由「**全库总条目** ≤ 上限」改为
+    #   「**每一册各自** ≤ 上限」。理由：总量随岁月线性长，只判总量 ⇒ 唯一出路是删记忆；
+    #   分册把「长」变成「多册」，记忆一条不丢。**上限值本身仍不许自动改**（保证 2 不变）。
+    from collections import Counter
+    per_book = Counter(rel for rel, _ in items)
     n = len(items)
-    if max_items > 0 and n > max_items:
-        hits.append(("L2 条目总数", n, max_items, "须降冷或合并"))
+    if max_items > 0:
+        for rel, cnt in sorted(per_book.items()):
+            if cnt > max_items:
+                hits.append((f"{rel}（单册）", cnt, max_items, "须分册"))
     for rel, size in items:
         if max_chars > 0 and size > max_chars:
             hits.append((rel, size, max_chars, "须蒸馏或拆分"))
-    obs = f"L2 条目 {n} / 上限 {max_items} ｜ 单件上限 {max_chars} 字符 ｜ 超限件 {len(hits)}"
+    obs = (f"L2 条目 {n} / 共 {len(per_book)} 册 ｜ 单册上限 {max_items} ｜ "
+           f"单件上限 {max_chars} 字符 ｜ 超限件 {len(hits)}")
     return hits, obs
 
 
@@ -70,7 +78,9 @@ def _mutates_limit(src: str) -> bool:
 def selftest() -> int:
     print("== selftest（三态 ＋ 双保证）==")
     items_ok = [("a.md", 100), ("b.md", 200)]
-    items_over = [("a.md", 100)] * 4
+    items_over = [("a.md", 100)] * 4          # 同一册 4 条 ⇒ 单册触顶
+    items_split = [("ERRORS.md", 100), ("ERRORS_02.md", 100),
+                   ("LEARNINGS_03.md", 100)]  # 合计 3 条但每册 1 条 ⇒ 分册后应放行
     conf_ok = {"L2_MAX_ITEMS": 10, "L2_MAX_CHARS": 1000}
     conf_low = {"L2_MAX_ITEMS": 2, "L2_MAX_CHARS": 1000}
     conf_missing = {"L2_MAX_CHARS": 1000}  # 缺 L2_MAX_ITEMS ⇒ 走默认
@@ -79,6 +89,7 @@ def selftest() -> int:
     frozen = dict(conf_low)
     h2, _ = evaluate(items_over, conf_low)
     h3, _ = evaluate(items_ok, conf_missing)
+    h4, _ = evaluate(items_split, conf_low)
 
     src = Path(__file__).read_text(encoding="utf-8")
     no_grow_code = not _mutates_limit(src)          # 静态：无"改上限"语句
@@ -86,8 +97,9 @@ def selftest() -> int:
 
     cases = [
         ("态1 未触顶应无命中", h1 == []),
-        ("态2 触顶应命中并给处置建议", len(h2) == 1 and h2[0][3] == "须降冷或合并"),
+        ("态2 单册触顶应命中并给处置建议", len(h2) == 1 and h2[0][3] == "须分册"),
         ("态3 上限缺失应回落默认（不报错）", h3 == []),
+        ("态4 分册后单册未超 ⇒ 放行（合计超原上限不判死）", h4 == []),
         ("保证1 判定不改上限（行为验证）", conf_readonly),
         ("保证2 源码无「改上限」语句（AST 断言 · 机器禁自动扩）", no_grow_code),
     ]
