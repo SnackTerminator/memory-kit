@@ -1,6 +1,6 @@
 {
   "name": "memory-kit-workbuddy",
-  "version": "0.1.35",
+  "version": "0.1.36",
   "description": "memory-kit 在 WorkBuddy（母体）上的接入声明 —— 形态：接线注入（宿主钩子挂桥，不改内核）",
   "author": "Snack Terminator & 姜姜",
   "license": "MIT",
@@ -19,7 +19,7 @@
   "wiring": {
     "read": "SessionStart → tools/memory_bridge.py --inject（宿主侧脚本，非本套件）",
     "writebackGate": "Stop → tools/memory_bridge.py --stop（只记不写；同日一次告警；不阻断）",
-    "note": "注入事件曾用 UserPromptSubmit，本机自 2026-09-30 起未被平台调用 ⇒ 已改挂 SessionStart（已实证在跑）"
+    "note": "注入事件改用 SessionStart（每会话注一次够用、省每轮 token）；2026-11-08 复核：UserPromptSubmit 实际在跑（prompt_inject_trace 432 次／17 天），此前「未被平台调用」的记载已纠正。ChatStart 类事件＝未探"
   },
   "verified": {
     "date": "2026-10-02",
@@ -32,9 +32,9 @@
       "4_no_daemon_needed": "PASS —— 每事件起一次进程；套件侧 0 处服务/网络调用",
       "5_coexist": "PASS —— 宿主注入位（43,712 B）与库内（12,271 B）两版互不覆盖",
       "6_physical_separation": "PASS —— F 层已装进库；记忆只在 01-记忆档案/",
-      "7_carrier_change_detectable": "**PASS**（2026-10-03 由 PARTIAL 转）—— 宿主侧**已有持久代号生成器**：`memory_bridge.host_ids()` **首铸即落盘** `_run/memory_bridge_ids.json`，实测 `h_da7ca20fdbd8`／`m_9a24ae90b726`，二次调用同值；`--where` 自证。事件账已落 3 行"
+      "7_carrier_change_detectable": "**PASS**（2026-10-03 由 PARTIAL 转）—— 宿主侧**已有持久代号生成器**：`memory_bridge.host_ids()` **首铸即落盘** `_run/memory_bridge_ids.json`，实测 `h_da7ca20fdbd8`／`<机位代号>`，二次调用同值；`--where` 自证。事件账已落 3 行"
     },
     "knownDefect": "**已闭 —— 2026-10-03 实测**。原文：「库内跑 install/verify.py 的第②项（新生儿态自检）必 FAIL」。现况＝`[OK] ② 新生儿态自检 —— **不适用**（本根按 MANIFEST ⓪ 判为**库根**）` ⇒ **判据侧已识别库根，不再 FAIL**；原「正解」已在实现里，故**该待办已闭**。原文保留作沿革。",
-    "note": "**已连入宿主**：Hermes 裸库直读 ＋ WorkBuddy 桥注入（母体）＋ **WorkBuddy 1号机（2026-10-03 装 L1）** —— G4 判据②「≥2 异构宿主」在**形态**上更全（裸读＋注入两种接入面）。1号机代号见判据 7。"
+    "note": "**已连入宿主**：Hermes 裸库直读 ＋ WorkBuddy 桥注入（母体）＋ **WorkBuddy <机位1>（2026-10-03 装 L1）** —— G4 判据②「≥2 异构宿主」在**形态**上更全（裸读＋注入两种接入面）。<机位1>代号见判据 7。"
   }
 }

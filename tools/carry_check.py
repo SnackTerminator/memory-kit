@@ -295,6 +295,9 @@ def main(argv=None) -> int:
         lines += ['%s\t%d\t%s' % (rel, sz, m) for rel, sz, m in items]
         baseline.write_text('\n'.join(lines) + '\n', encoding='utf-8', newline='\n')
         print('-- 已写基线：%s（%d 行）' % (baseline, len(items)))
+        # 2026-11-10 修：刚写完的基线 = 当前状态 ⇒ 旧差异（上面按写前状态算的）已作废，
+        # 若仍据此判 bad，会打出「⚠️ 有待处理项」，让读者误以为写基线失败。
+        diffs = {'missing': [], 'extra': [], 'changed': []}
     elif not have_base:
         print('-- ⚠️ 无基线（%s 不存在）⇒ **只报现状，不判通过**' % BASELINE_NAME)
         print('   → 拔盘前请先跑一次：python tools/carry_check.py --root . --write-baseline')

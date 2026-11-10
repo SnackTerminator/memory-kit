@@ -31,7 +31,7 @@
 **报到哪里（二选一）**：
 
 - **GitHub Issues**（推荐 —— 公开、可检索、别人也帮得上）：`https://github.com/SnackTerminator/memory-kit/issues`
-- **邮箱**：`dudwr527318@163.com`（不方便公开时用）
+- **邮箱**：`jiangjiang5566@agent.qq.com`（不方便公开时用）
 
 > ⚠️ **两条通道都请先按 §四 脱敏** —— 尤其往邮箱发时，**不要把没脱敏的库内容贴进来**。
 
